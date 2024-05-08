@@ -8,10 +8,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "port_system.h"
 
-#ifdef USE_SEMIHOSTING
-extern void initialise_monitor_handles(void);
-#endif
-
 /* Defines -------------------------------------------------------------------*/
 #define HSI_VALUE ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz */
 
@@ -92,10 +88,6 @@ void system_clock_config(void)
 
 size_t port_system_init()
 {
-#ifdef USE_SEMIHOSTING
-  initialise_monitor_handles();
-#endif
-
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   /* Configure Flash prefetch, Instruction cache, Data cache */
   /* Instruction cache enable */
@@ -158,6 +150,16 @@ void port_system_delay_until_ms(uint32_t *p_t, uint32_t ms)
     port_system_delay_ms(until - now);
   }
   *p_t = port_system_get_millis();
+}
+
+void port_system_systick_resume()
+{
+  SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;
+}
+
+void port_system_systick_suspend()
+{
+  SysTick->CTRL &= ~SysTick_CTRL_TICKINT_Msk;
 }
 
 //------------------------------------------------------
@@ -263,28 +265,76 @@ void port_system_gpio_config_alternate(GPIO_TypeDef *p_port, uint8_t pin, uint8_
   p_port->AFR[(uint8_t)(pin / 8)] |= (alternate << displacement);
 }
 
+/**
+ * @brief Read the digital value of a GPIO.
+ * 
+ * @param p_port Port of the GPIO (CMSIS struct like)
+ * @param pin Pin/line of the GPIO (index from 0 to 15)
+ * @return true if the GPIO was HIGH
+ * @return false if the GPIO was LOW
+ */
+
 bool port_system_gpio_read(GPIO_TypeDef *p_port, uint8_t pin)
 {
-  return (p_port->IDR & BIT_POS_TO_MASK(pin)) ? true : false;
+  bool prev_value = (bool)(p_port->IDR & BIT_POS_TO_MASK(pin));
+  return prev_value;
 }
 
-void port_system_gpio_write(GPIO_TypeDef *p_port, uint8_t pin, bool state)
+/**
+ * @brief Write a digital value in a GPIO atomically.
+ * 
+ * @param p_port Port of the GPIO (CMSIS struct like)
+ * @param pin Pin/line of the GPIO (index from 0 to 15)
+ * @param value Boolean value to set the GPIO to HIGH (1, true) or LOW (0, false)
+ * @return true 
+ * @return false 
+ */
+
+void port_system_gpio_write(GPIO_TypeDef *p_port, uint8_t pin, bool value)
 {
-  if (state)
+  if (value)
   {
     p_port->BSRR = BIT_POS_TO_MASK(pin);
   }
   else
   {
-    p_port->BSRR = (BIT_POS_TO_MASK(pin) << 16);
+    p_port->BSRR = BIT_POS_TO_MASK(pin) << 16;
   }
 }
 
+/**
+ * @brief Toggle the value of a GPIO.
+ * 
+ * @param p_port Port of the GPIO (CMSIS struct like)
+ * @param pin Pin/line of the GPIO (index from 0 to 15)
+ */
+
 void port_system_gpio_toggle(GPIO_TypeDef *p_port, uint8_t pin)
 {
-  port_system_gpio_write(p_port, pin, !port_system_gpio_read(p_port, pin));
+  bool leer = port_system_gpio_read(p_port, pin);
+  bool contrario = !leer;
+  port_system_gpio_write(p_port, pin, contrario);
 }
-
 // ------------------------------------------------------
 // POWER RELATED FUNCTIONS
 // ------------------------------------------------------
+
+void port_system_power_stop()
+{
+ MODIFY_REG(PWR->CR, (PWR_CR_PDDS | PWR_CR_LPDS), PWR_CR_LPDS);   // Select the regulator state in Stop mode: Set PDDS and LPDS bits according to PWR_Regulator value
+ SCB->SCR |= ((uint32_t)SCB_SCR_SLEEPDEEP_Msk);   // Set SLEEPDEEP bit of Cortex System Control Register
+ __WFI(); // Select Stop mode entry : Request Wait For Interrupt
+ SCB->SCR &= ~((uint32_t)SCB_SCR_SLEEPDEEP_Msk); // Reset SLEEPDEEP bit of Cortex System Control Register
+}
+
+void port_system_power_sleep()
+{
+ MODIFY_REG(PWR->CR, (PWR_CR_PDDS | PWR_CR_LPDS), PWR_CR_LPDS);   // Select the regulator state in Stop mode: Set PDDS and LPDS bits according to PWR_Regulator value
+ SCB->SCR &= ~((uint32_t)SCB_SCR_SLEEPDEEP_Msk);   // Reset SLEEPDEEP bit of Cortex System Control Register
+ __WFI(); // Select Sleep mode entry : Request Wait For Interrupt
+}
+
+void port_system_sleep(void){
+  port_system_systick_suspend();
+  port_system_power_sleep();
+}	

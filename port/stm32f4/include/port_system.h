@@ -95,7 +95,7 @@ uint32_t port_system_get_millis(void);
  * > **TO-DO alumnos:**
  * >
  * > ✅ 1. Set System tick to the value received \n
- * 
+ *
  * @param ms New number of milliseconds since the system started.
 º */
 void port_system_set_millis(uint32_t ms);
@@ -120,6 +120,23 @@ void port_system_delay_ms(uint32_t ms);
  * @retval None
  */
 void port_system_delay_until_ms(uint32_t *p_t, uint32_t ms);
+
+/**
+ * @brief The SysTick timer is the source of time base. It is used to generate interrupts at regular time intervals.
+ * Once this function is called, the SysTick interrupt will be enabled and so Tick increment is resumed.
+ * 
+ */
+
+void port_system_systick_resume();
+
+/**
+ * @brief The SysTick timer is the source of time base. It is used to generate interrupts at regular time intervals.
+ * Once this function is called, the SysTick interrupt will be disabled so it saves more energy and it does not generate any interruption.
+ * 
+ */
+
+void port_system_systick_suspend();
+
 
 /** @verbatim
       ==============================================================================
@@ -246,10 +263,62 @@ void port_system_gpio_exti_enable(uint8_t pin, uint8_t priority, uint8_t subprio
  */
 void port_system_gpio_exti_disable(uint8_t pin);
 
-bool port_system_gpio_read(GPIO_TypeDef *p_port, uint8_t pin);
+/**
+ * @brief Read the digital value of a GPIO.
+ * 
+ * @param p_port Port of the GPIO (CMSIS struct like)
+ * @param pin Pin/line of the GPIO (index from 0 to 15)
+ * @return true if the GPIO was HIGH
+ * @return false if the GPIO was LOW
+ */
 
-void port_system_gpio_write(GPIO_TypeDef *p_port, uint8_t pin, bool state);
+bool port_system_gpio_read (GPIO_TypeDef *p_port, uint8_t pin);
 
-void port_system_gpio_toggle(GPIO_TypeDef *p_port, uint8_t pin);
+/**
+ * @brief Write a digital value in a GPIO atomically.
+ * @note You can use a +16 offset on the pin index and use the BIT_POS_TO_MASK(pin) macro to get the mask when you go to clear a GPIO. 
+ * Otherwise, you can calculate the pin mask first and then use a 16-position left shift of the mask.
+ * 
+ * @param p_port Port of the GPIO (CMSIS struct like)
+ * @param pin Pin/line of the GPIO (index from 0 to 15)
+ * @param value Boolean value to set the GPIO to HIGH (1, true) or LOW (0, false)
+ */
+
+void port_system_gpio_write (GPIO_TypeDef *p_port, uint8_t pin, bool value);
+
+/**
+ * @brief Toggle the value of a GPIO.
+ * 
+ * @param p_port Port of the GPIO (CMSIS struct like)
+ * @param pin Pin/line of the GPIO (index from 0 to 15)
+ */
+
+void port_system_gpio_toggle (GPIO_TypeDef *p_port, uint8_t pin);
+
+/**
+ * @brief The function sets the state of the power regulator in stop mode.
+ * After that, the function sets the system mode in sleep mode, to enter in stop mode when calling __WFI() (wait for interruption).
+ * The system remains in this line until an external interruption or timer interruption occurs.
+ * If an interruption occurs the system wakes up and resets the system mode.
+ * 
+ */
+
+void port_system_power_stop();
+
+/**
+ * @brief  The function sets the state of the power regulator in sleep mode.
+ * After that, the function sets the system mode in sleep mode, to enter in sleep mode when calling __WFI() (wait for interruption).
+ * The system remains in this line until an external interruption or timer interruption occurs.
+ * 
+ */
+
+void port_system_power_sleep();
+
+/**
+ * @brief Enable low power consumption in sleep mode.
+ * 
+ */
+
+void port_system_sleep(void);
 
 #endif /* PORT_SYSTEM_H_ */
